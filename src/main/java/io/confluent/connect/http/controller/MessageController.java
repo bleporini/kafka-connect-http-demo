@@ -24,7 +24,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.lang.System.currentTimeMillis;
 import static java.util.stream.Collectors.toList;
 
 @RestController
@@ -33,12 +35,32 @@ public class MessageController {
 
   private final MessageRepository messageRepository;
 
+  private final AtomicBoolean shouldRaiseException = new AtomicBoolean(false);
+
   public MessageController(MessageRepository messageRepository) {
     this.messageRepository = messageRepository;
   }
 
+  @PostMapping("/config/respondAlwaysError")
+  public void postRespondAlwaysError() {
+    log.warn("Now all endpoints are throwing an exception");
+    shouldRaiseException.set(true);
+  }
+
+  @PostMapping("/config/respondNormal")
+  public void postRespondNormal() {
+    log.info("Back to normal operations without unconditional errors");
+    shouldRaiseException.set(false);
+  }
+
+  private void checkError() {
+    if(shouldRaiseException.get())
+      throw new RuntimeException("Generated error at " + currentTimeMillis());
+  }
+
   @PutMapping(path = "/api/messages")
   public ResponseEntity putMessage(@RequestBody String message) {
+    checkError();
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(save(message));
@@ -46,6 +68,7 @@ public class MessageController {
 
   @PostMapping(path = "/api/messages")
   public ResponseEntity createMessage(@RequestBody String message) {
+    checkError();
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(save(message));
@@ -53,6 +76,7 @@ public class MessageController {
 
   @DeleteMapping(path = "/api/messages/{id}")
   public ResponseEntity deleteMessage(@PathVariable String id) {
+    checkError();
     log.warn("DELETING MESSAGE WITH ID: {}", id);
 
     try {
@@ -69,6 +93,7 @@ public class MessageController {
 
   @PostMapping(path = "/api/messages/batch")
   public ResponseEntity createMessages(@RequestBody List<String> messages) {
+    checkError();
     log.info("MESSAGES RECEIVED: {}", messages);
 
     // convert to Message
